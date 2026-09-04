@@ -1,0 +1,85 @@
+import time
+import sys
+import requests
+
+def load_github_data(username):
+    print(f"\n✨ Connecting to GitHub to summon hero '{username}'...")
+    url = f"https://github.com{username}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "name": data.get("name") or username,
+                "hp": max(60, data.get("public_repos", 0) * 10),
+                "attack": max(15, data.get("followers", 0) * 2),
+                "bio": data.get("bio") or "A mysterious programmer..."
+            }
+        else:
+            print("⚠️ User not found! Creating a default hero...")
+            return None
+    except Exception:
+        print("⚠️ Connection error. Creating a default hero...")
+        return None
+
+def start_battle(hero):
+    monsters = [
+        {"name": "Merge Conflict 👹", "hp": 120, "attack": 12, "phrase": "Your branch is 10 commits behind!"},
+        {"name": "Infinite Loop 🌀", "hp": 150, "attack": 18, "phrase": "while(true) { ruin_your_day() }"},
+        {"name": "Production Bug 🐛", "hp": 200, "attack": 25, "phrase": "The server crashed on Friday at 5:00 PM!"}
+    ]
+    
+    print(f"\n{'='*50}")
+    print(f"🎮 WELCOME TO GITQUEST, {hero['name'].upper()}!")
+    print(f"📜 Global Status: {hero['bio']}")
+    print(f"❤️ Your HP: {hero['hp']} | ⚔️ Your Attack: {hero['attack']}")
+    print(f"{'='*50}\n")
+    time.sleep(1.5)
+
+    for i, monster in enumerate(monsters, 1):
+        print(f"\n🚀 STAGE {i}: A wild '{monster['name']}' appeared!")
+        print(f"💬 It screams: \"{monster['phrase']}\"")
+        time.sleep(1.5)
+        
+        while hero["hp"] > 0 and monster["hp"] > 0:
+            print(f"\n🧑‍💻 {hero['name']}: {hero['hp']} HP | {monster['name']}: {monster['hp']} HP")
+            choice = input("Choose your action:\n1. Commit (Attack)\n2. Read Docs (Heal)\nYour choice: ").strip()
+            
+            if choice == "1":
+                print(f"⚔️ You dropped a heavy commit! Dealing {hero['attack']} damage.")
+                monster["hp"] -= hero["attack"]
+            elif choice == "2":
+                heal = 30
+                hero["hp"] += heal
+                print(f"📚 You read the documentation on StackOverflow and recovered {heal} HP!")
+            else:
+                print("❌ Invalid command! You messed up the syntax and lost your turn.")
+                
+            time.sleep(1)
+            
+            if monster["hp"] <= 0:
+                print(f"🎉 You defeated the {monster['name']}!")
+                break
+                
+            print(f"💥 The {monster['name']} counter-attacks!")
+            hero["hp"] -= monster["attack"]
+            print(f"You lost {monster['attack']} HP.")
+            time.sleep(1)
+            
+        if hero["hp"] <= 0:
+            break
+
+    print(f"\n{'='*50}")
+    if hero["hp"] > 0:
+        print("🏆 CONGRATULATIONS! You built the project, cleared the bugs, and PUSHED TO SUCCESS!")
+    else:
+        print("💀 GAME OVER! Your code broke and you spent the entire weekend refactoring.")
+    print(f"{'='*50}\n")
+
+if __name__ == "__main__":
+    print("🤖 --- GitQuest Terminal RPG --- 🤖")
+    user = input("Enter your GitHub username: ").strip()
+    hero_data = load_github_data(user)
+    if not hero_data:
+        hero_data = {"name": user, "hp": 100, "attack": 20, "bio": "Fearless Developer."}
+    start_battle(hero_data)
