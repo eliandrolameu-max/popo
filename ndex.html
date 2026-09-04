@@ -1,85 +1,287 @@
-import time
-import sys
-import requests
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitQuest: The Commit RPG</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --text-color: #c9d1d9;
+            --accent-color: #58a6ff;
+            --success-color: #238636;
+            --danger-color: #da3633;
+            --card-bg: #161b22;
+            --border-color: #30363d;
+        }
 
-def load_github_data(username):
-    print(f"\n✨ Connecting to GitHub to summon hero '{username}'...")
-    url = f"https://github.com{username}"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "name": data.get("name") or username,
-                "hp": max(60, data.get("public_repos", 0) * 10),
-                "attack": max(15, data.get("followers", 0) * 2),
-                "bio": data.get("bio") or "A mysterious programmer..."
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .game-container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 24px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            color: var(--accent-color);
+            text-align: center;
+            margin-top: 0;
+            font-size: 24px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: var(--success-color);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:disabled {
+            background-color: var(--border-color);
+            cursor: not-allowed;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        .status-bars {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-box {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .hp-bar-container {
+            background: #21262d;
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .hp-bar {
+            height: 100%;
+            background-color: var(--success-color);
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .actions button {
+            flex: 1;
+        }
+
+        .btn-attack { background-color: var(--danger-color); }
+        .btn-heal { background-color: var(--accent-color); }
+
+        .console-log {
+            background-color: #010409;
+            border: 1px solid var(--border-color);
+            height: 150px;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 13px;
+            border-radius: 6px;
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .log-entry { margin: 0; }
+        .log-system { color: #8b949e; }
+        .log-damage { color: #f85149; }
+        .log-heal { color: #58a6ff; }
+        .log-victory { color: #56d364; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>🎮 GitQuest: The Commit RPG</h1>
+
+        <!-- SCREEN 1: LOGIN -->
+        <div id="screen-login" class="screen active">
+            <p style="text-align: center; color: #8b949e;">Your GitHub profile stats determine your hero's HP and Attack power!</p>
+            <div class="input-group">
+                <input type="text" id="username" placeholder="Enter GitHub username..." autocomplete="off">
+                <button id="btn-start" onclick="fetchGitHubData()">Summon</button>
+            </div>
+            <p id="login-error" style="color: var(--danger-color); text-align: center; font-size: 14px;"></p>
+        </div>
+
+        <!-- SCREEN 2: GAMEPLAY -->
+        <div id="screen-game" class="screen">
+            <div class="status-bars">
+                <!-- HERO -->
+                <div class="status-box">
+                    <strong id="hero-name">Player</strong>
+                    <div class="hp-bar-container"><div id="hero-hp-bar" class="hp-bar"></div></div>
+                    <span id="hero-hp-text" style="font-size: 12px;">100/100 HP</span><br>
+                    <span id="hero-atk-text" style="font-size: 12px; color: #8b949e;">⚔️ ATK: 15</span>
+                </div>
+                <!-- MONSTER -->
+                <div class="status-box">
+                    <strong id="monster-name">Bug 👹</strong>
+                    <div class="hp-bar-container"><div id="monster-hp-bar" class="hp-bar" style="background-color: var(--danger-color);"></div></div>
+                    <span id="monster-hp-text" style="font-size: 12px;">100/100 HP</span><br>
+                    <span id="monster-stage" style="font-size: 12px; color: #8b949e;">Stage 1/3</span>
+                </div>
+            </div>
+
+            <div class="console-log" id="console-log"></div>
+
+            <div class="actions" id="action-buttons">
+                <button class="btn-attack" onclick="playerAction('attack')">⚔️ Commit (Attack)</button>
+                <button class="btn-heal" onclick="playerAction('heal')">📚 Read Docs (Heal)</button>
+            </div>
+            
+            <button id="btn-restart" style="display: none; width: 100%; margin-top: 15px;" onclick="restartGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        let hero = { name: "", hp: 100, maxHp: 100, attack: 15 };
+        let monster = { name: "", hp: 100, maxHp: 100, attack: 10 };
+        let currentStage = 0;
+
+        const monstersDataset = [
+            { name: "Merge Conflict 👹", hp: 100, attack: 12, phrase: "Your branch is 10 commits behind!" },
+            { name: "Infinite Loop 🌀", hp: 140, attack: 18, phrase: "while(true) { ruin_your_day() }" },
+            { name: "Production Bug 🐛", hp: 180, attack: 24, phrase: "The server crashed on Friday at 5:00 PM!" }
+        ];
+
+        async function fetchGitHubData() {
+            const username = document.getElementById('username').value.trim();
+            const btn = document.getElementById('btn-start');
+            const errorText = document.getElementById('login-error');
+            
+            if (!username) return;
+            
+            btn.disabled = true;
+            errorText.innerText = "Connecting to GitHub API...";
+
+            try {
+                const response = await fetch(`https://github.com{username}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    hero.name = data.name || username;
+                    hero.maxHp = Math.max(60, (data.public_repos || 0) * 10);
+                    hero.attack = Math.max(15, (data.followers || 0) * 2);
+                } else {
+                    setupFallbackHero(username);
+                }
+                startGame();
+            } catch (e) {
+                setupFallbackHero(username);
+                startGame();
             }
-        else:
-            print("⚠️ User not found! Creating a default hero...")
-            return None
-    except Exception:
-        print("⚠️ Connection error. Creating a default hero...")
-        return None
+        }
 
-def start_battle(hero):
-    monsters = [
-        {"name": "Merge Conflict 👹", "hp": 120, "attack": 12, "phrase": "Your branch is 10 commits behind!"},
-        {"name": "Infinite Loop 🌀", "hp": 150, "attack": 18, "phrase": "while(true) { ruin_your_day() }"},
-        {"name": "Production Bug 🐛", "hp": 200, "attack": 25, "phrase": "The server crashed on Friday at 5:00 PM!"}
-    ]
-    
-    print(f"\n{'='*50}")
-    print(f"🎮 WELCOME TO GITQUEST, {hero['name'].upper()}!")
-    print(f"📜 Global Status: {hero['bio']}")
-    print(f"❤️ Your HP: {hero['hp']} | ⚔️ Your Attack: {hero['attack']}")
-    print(f"{'='*50}\n")
-    time.sleep(1.5)
+        function setupFallbackHero(username) {
+            hero.name = username || "Unknown Dev";
+            hero.maxHp = 100;
+            hero.attack = 20;
+        }
 
-    for i, monster in enumerate(monsters, 1):
-        print(f"\n🚀 STAGE {i}: A wild '{monster['name']}' appeared!")
-        print(f"💬 It screams: \"{monster['phrase']}\"")
-        time.sleep(1.5)
-        
-        while hero["hp"] > 0 and monster["hp"] > 0:
-            print(f"\n🧑‍💻 {hero['name']}: {hero['hp']} HP | {monster['name']}: {monster['hp']} HP")
-            choice = input("Choose your action:\n1. Commit (Attack)\n2. Read Docs (Heal)\nYour choice: ").strip()
+        function startGame() {
+            hero.hp = hero.maxHp;
+            currentStage = 0;
             
-            if choice == "1":
-                print(f"⚔️ You dropped a heavy commit! Dealing {hero['attack']} damage.")
-                monster["hp"] -= hero["attack"]
-            elif choice == "2":
-                heal = 30
-                hero["hp"] += heal
-                print(f"📚 You read the documentation on StackOverflow and recovered {heal} HP!")
-            else:
-                print("❌ Invalid command! You messed up the syntax and lost your turn.")
-                
-            time.sleep(1)
+            document.getElementById('screen-login').classList.remove('active');
+            document.getElementById('screen-game').classList.add('active');
             
-            if monster["hp"] <= 0:
-                print(f"🎉 You defeated the {monster['name']}!")
-                break
-                
-            print(f"💥 The {monster['name']} counter-attacks!")
-            hero["hp"] -= monster["attack"]
-            print(f"You lost {monster['attack']} HP.")
-            time.sleep(1)
+            document.getElementById('hero-name').innerText = hero.name;
+            document.getElementById('hero-atk-text').innerText = `⚔️ ATK: ${hero.attack}`;
             
-        if hero["hp"] <= 0:
-            break
+            logMessage(`🎮 Game Started! Welcome, ${hero.name}.`, 'log-victory');
+            loadStage();
+        }
 
-    print(f"\n{'='*50}")
-    if hero["hp"] > 0:
-        print("🏆 CONGRATULATIONS! You built the project, cleared the bugs, and PUSHED TO SUCCESS!")
-    else:
-        print("💀 GAME OVER! Your code broke and you spent the entire weekend refactoring.")
-    print(f"{'='*50}\n")
+        function loadStage() {
+            if (currentStage >= monstersDataset.length) {
+                endGame(true);
+                return;
+            }
+            const data = monstersDataset[currentStage];
+            monster.name = data.name;
+            monster.maxHp = data.hp;
+            monster.hp = data.hp;
+            monster.attack = data.attack;
 
-if __name__ == "__main__":
-    print("🤖 --- GitQuest Terminal RPG --- 🤖")
-    user = input("Enter your GitHub username: ").strip()
-    hero_data = load_github_data(user)
-    if not hero_data:
-        hero_data = {"name": user, "hp": 100, "attack": 20, "bio": "Fearless Developer."}
-    start_battle(hero_data)
+            document.getElementById('monster-name').innerText = monster.name;
+            document.getElementById('monster-stage').innerText = `Stage ${currentStage + 1}/${monstersDataset.length}`;
+            
+            logMessage(`🚀 STAGE ${currentStage + 1}: ${monster.name} appeared!`, 'log-system');
+            logMessage(`💬 "${data.phrase}"`, 'log-system');
+            updateUI();
+        }
+
+        function playerAction(type) {
+            if (hero.hp <= 0 || monster.hp <= 0) return;
+
+            if (type === 'attack') {
+                logMessage(`⚔️ You dropped a heavy commit! Dealing ${hero.attack} damage.`, 'log-heal');
+                monster.hp -= hero.attack;
+            } else if (type === 'heal') {
+                const healAmount = 30;
+                hero.hp = Math.min(hero.maxHp, hero.hp + healAmount);
+                logMessage(`📚 You read Docs on StackOverflow and recovered ${healAmount} HP.`, 'log-heal');
